@@ -2,6 +2,7 @@
 Instagram + Facebook scraper using Apify.
 Detects Reels, fetches transcripts via Apify trakk actor, writes all to Supabase.
 """
+import os
 import datetime
 from apify_client import ApifyClient
 from db_write import get_competitor_id, write_instagram_posts, write_facebook_posts
