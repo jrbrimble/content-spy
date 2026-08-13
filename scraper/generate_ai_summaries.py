@@ -11,8 +11,8 @@ httpx.Client.__init__ = lambda self, *a, **kw: _orig_client(self, *a, **{**kw, '
 _orig_async = httpx.AsyncClient.__init__
 httpx.AsyncClient.__init__ = lambda self, *a, **kw: _orig_async(self, *a, **{**kw, 'verify': False})
 
-os.environ.setdefault("SUPABASE_URL", "https://kmswdyuzatobdfuelyyu.supabase.co")
-os.environ.setdefault("SUPABASE_KEY", "sb_publishable_wui8qrPXc6lj8qMGti2nkw_RwzcFcK5")
+os.environ.setdefault("SUPABASE_URL", "https://rbjzruynjahyvpzkcvgf.supabase.co")
+os.environ.setdefault("SUPABASE_KEY", "sb_publishable_-T34HLnZo5KSaeoVZF9oYQ_DbuAVOnn")
 
 from db_write import get_client
 from google import genai

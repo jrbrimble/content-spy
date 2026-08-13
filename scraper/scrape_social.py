@@ -11,7 +11,7 @@ APIFY_TOKEN = os.environ.get("APIFY_API_KEY", "")
 client = ApifyClient(APIFY_TOKEN)
 
 CURRENT_DATE = datetime.datetime.now(datetime.timezone.utc)
-SEVEN_DAYS_AGO = CURRENT_DATE - datetime.timedelta(days=7)
+THIRTY_DAYS_AGO = CURRENT_DATE - datetime.timedelta(days=30)
 
 PROFILES = {
     "dan-martell": {
@@ -78,18 +78,19 @@ def scrape_instagram() -> dict[str, list[dict]]:
     for item in items:
         owner = (item.get("ownerUsername") or "").lower()
         input_url = (item.get("inputUrl") or "").lower()
+        item_url = (item.get("url") or "").lower()
 
         slug = None
         for s, data in PROFILES.items():
             handle = data["instagram"].rstrip("/").split("/")[-1].lower()
-            if handle in owner or handle in input_url:
+            if handle in owner or handle in input_url or handle in item_url:
                 slug = s
                 break
         if not slug:
             continue
 
-        pub_dt = parse_ts(item.get("timestamp"))
-        if not pub_dt or pub_dt < SEVEN_DAYS_AGO:
+        pub_dt = parse_ts(item.get("timestamp")) or CURRENT_DATE
+        if pub_dt < THIRTY_DAYS_AGO:
             continue
 
         # Detect reel/video
@@ -201,28 +202,28 @@ def scrape_facebook() -> dict[str, list[dict]]:
     results: dict[str, list[dict]] = {slug: [] for slug in PROFILES}
 
     for item in items:
-        fb_url = (item.get("facebookUrl") or "").lower()
-        user_name = (item.get("user", {}).get("name") or "").lower()
+        fb_url = (item.get("facebookUrl") or item.get("inputUrl") or item.get("url") or "").lower()
+        user_name = (item.get("user", {}).get("name") or item.get("pageName") or "").lower()
 
         slug = None
         if "danmartell" in fb_url or "dan martell" in user_name:
             slug = "dan-martell"
-        elif "rmulready" in fb_url or "rick mulready" in user_name:
+        elif "rmulready" in fb_url or "rick mulready" in user_name or "rickmulready" in fb_url:
             slug = "rick-mulready"
-        elif "singlegrain" in fb_url or "single grain" in user_name or "eric siu" in user_name:
+        elif "singlegrain" in fb_url or "single grain" in user_name or "eric siu" in user_name or "ericosiu" in fb_url:
             slug = "eric-siu"
-        elif "aishowpod" in fb_url or "ai show" in user_name:
+        elif "aishowpod" in fb_url or "ai show" in user_name or "aishow" in fb_url:
             slug = "ai-show-podcast"
-        elif "sabr1naram" in fb_url or "sabrina ramonov" in user_name:
+        elif "sabr1naram" in fb_url or "sabrina ramonov" in user_name or "sabrina_ramonov" in fb_url:
             slug = "sabrina-ramonov"
-        elif "lyfemarketing" in fb_url or "lyfe marketing" in user_name or "sean standberry" in user_name:
+        elif "lyfemarketing" in fb_url or "lyfe marketing" in user_name or "sean standberry" in user_name or "seanstandberry" in fb_url:
             slug = "sean-standberry"
 
         if not slug:
             continue
 
-        pub_dt = parse_ts(item.get("timestamp") or item.get("time"))
-        if not pub_dt or pub_dt < SEVEN_DAYS_AGO:
+        pub_dt = parse_ts(item.get("timestamp") or item.get("time")) or CURRENT_DATE
+        if pub_dt < THIRTY_DAYS_AGO:
             continue
 
         results[slug].append({

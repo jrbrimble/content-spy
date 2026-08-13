@@ -18,7 +18,7 @@ CHANNELS = {
 }
 
 ydl_opts = {
-    "extract_flat": False,
+    "extract_flat": True,
     "quiet": True,
     "playlistend": 10,
     "nocheckcertificate": True,
@@ -32,20 +32,23 @@ def fetch_youtube(slug: str, channel_url: str) -> list[dict]:
             info = ydl.extract_info(f"{channel_url}/videos", download=False)
             if not info or "entries" not in info:
                 return []
-            for entry in info["entries"]:
+            for entry in info.get("entries", []):
                 if not entry:
                     continue
-                upload_date_str = entry.get("upload_date")
-                if not upload_date_str:
-                    continue
-                pub_dt = datetime.datetime.strptime(upload_date_str, "%Y%m%d").replace(
-                    tzinfo=datetime.timezone.utc
-                )
-                if pub_dt < FOURTEEN_DAYS_AGO:
-                    continue
+                
+                # Extract date from timestamp or default to today
+                ts = entry.get("timestamp")
+                if ts:
+                    pub_dt = datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc)
+                else:
+                    pub_dt = CURRENT_DATE
+
+                video_id = entry.get("id") or ""
+                url = f"https://www.youtube.com/watch?v={video_id}" if video_id else entry.get("url", "")
+                
                 videos.append({
                     "title": entry.get("title", ""),
-                    "url": f"https://www.youtube.com/watch?v={entry.get('id', '')}",
+                    "url": url,
                     "views": entry.get("view_count") or 0,
                     "date": pub_dt.strftime("%Y-%m-%d"),
                     "description": (entry.get("description") or "")[:2000],

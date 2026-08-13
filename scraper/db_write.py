@@ -13,14 +13,14 @@ httpx.Client.__init__ = lambda self, *args, **kwargs: original_client_init(self,
 original_async_client_init = httpx.AsyncClient.__init__
 httpx.AsyncClient.__init__ = lambda self, *args, **kwargs: original_async_client_init(self, *args, **{**kwargs, 'verify': False})
 
-os.environ.setdefault("SUPABASE_URL", "https://kmswdyuzatobdfuelyyu.supabase.co")
-os.environ.setdefault("SUPABASE_KEY", "sb_publishable_wui8qrPXc6lj8qMGti2nkw_RwzcFcK5")
+os.environ.setdefault("SUPABASE_URL", "https://rbjzruynjahyvpzkcvgf.supabase.co")
+os.environ.setdefault("SUPABASE_KEY", "sb_publishable_-T34HLnZo5KSaeoVZF9oYQ_DbuAVOnn")
 
 import datetime
 from supabase import create_client, Client
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+SUPABASE_URL = os.environ.get("SUPABASE_URL") or "https://rbjzruynjahyvpzkcvgf.supabase.co"
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or "sb_publishable_-T34HLnZo5KSaeoVZF9oYQ_DbuAVOnn"
 
 _client: Client = None
 
