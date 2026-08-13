@@ -7,21 +7,71 @@ let isRunning = false
 let lastStarted: string | null = null
 
 export async function GET() {
-  return NextResponse.json({ running: isRunning, lastStarted })
-}
-
-export async function POST() {
-  if (isRunning) {
-    return NextResponse.json(
-      { success: false, message: 'Scraper is already running. Please wait.' },
-      { status: 409 }
-    )
-  }
-
   const githubPat = process.env.GITHUB_PAT
   const isProduction = process.env.NODE_ENV === 'production' || !!githubPat
 
   if (isProduction && githubPat) {
+    try {
+      // Check latest workflow run status from GitHub
+      const res = await fetch(
+        'https://api.github.com/repos/jrbrimble/content-spy/actions/workflows/scrape.yml/runs?per_page=1',
+        {
+          headers: {
+            'Accept': 'application/vnd.github.v3+json',
+            'Authorization': `Bearer ${githubPat}`,
+          },
+        }
+      )
+      if (res.ok) {
+        const data = await res.json()
+        const latestRun = data.workflow_runs?.[0]
+        if (latestRun) {
+          const isWorkflowRunning = latestRun.status === 'in_progress' || latestRun.status === 'queued'
+          return NextResponse.json({ 
+            running: isWorkflowRunning, 
+            lastStarted: latestRun.created_at 
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch GitHub Actions status:', err)
+    }
+  }
+
+  // Fallback to local memory state
+  return NextResponse.json({ running: isRunning, lastStarted })
+}
+
+export async function POST() {
+  const githubPat = process.env.GITHUB_PAT
+  const isProduction = process.env.NODE_ENV === 'production' || !!githubPat
+
+  if (isProduction && githubPat) {
+    // Check if it's already running on GitHub
+    try {
+      const statusRes = await fetch(
+        'https://api.github.com/repos/jrbrimble/content-spy/actions/workflows/scrape.yml/runs?per_page=1',
+        {
+          headers: {
+            'Accept': 'application/vnd.github.v3+json',
+            'Authorization': `Bearer ${githubPat}`,
+          },
+        }
+      )
+      if (statusRes.ok) {
+        const data = await statusRes.json()
+        const latestRun = data.workflow_runs?.[0]
+        if (latestRun && (latestRun.status === 'in_progress' || latestRun.status === 'queued')) {
+          return NextResponse.json(
+            { success: false, message: 'Scraper is already running on GitHub. Please wait.' },
+            { status: 409 }
+          )
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
     try {
       const res = await fetch(
         'https://api.github.com/repos/jrbrimble/content-spy/actions/workflows/scrape.yml/dispatches',
