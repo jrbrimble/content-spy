@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+.env.local
+*.json
+*.pdf
+*.txt
+!requirements.txt
+content-spy-app/node_modules/
+content-spy-app/.next/
+content-spy-app/out/
+content-spy-app/build/
