@@ -1,5 +1,5 @@
-apify-client==1.6.4
-supabase==2.3.4
-python-dotenv==1.0.1
-requests==2.31.0
-google-genai==2.18.0
+apify-client
+supabase
+python-dotenv
+requests
+google-genai
