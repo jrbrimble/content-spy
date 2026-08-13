@@ -3,6 +3,8 @@ __pycache__/
 .env
 .env.local
 *.json
+!package.json
+!vercel.json
 *.pdf
 *.txt
 !requirements.txt
