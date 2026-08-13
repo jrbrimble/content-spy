@@ -131,3 +131,31 @@ def write_facebook_posts(competitor_id: str, posts: list[dict]):
     if rows:
         client.table("facebook_posts").insert(rows).execute()
         print(f"  Wrote {len(rows)} Facebook posts")
+
+
+def write_viral_posts(posts: list[dict]):
+    """Insert or update viral posts for a niche."""
+    client = get_client()
+    rows = []
+    for p in posts:
+        rows.append({
+            "niche": p.get("niche", "AI Agents"),
+            "platform": p.get("platform", "instagram"),
+            "creator_name": p.get("creator_name", ""),
+            "creator_handle": p.get("creator_handle", ""),
+            "caption": (p.get("caption") or "")[:2000],
+            "url": p.get("url", ""),
+            "views": p.get("views") or 0,
+            "likes": p.get("likes") or 0,
+            "estimated_reach": p.get("estimated_reach") or 0,
+            "published_at": p.get("published_at") or p.get("date"),
+            "scraped_at": datetime.datetime.utcnow().isoformat()
+        })
+    if rows:
+        # Delete old viral posts for this niche and platform before writing fresh top 10
+        niche = posts[0].get("niche", "AI Agents") if posts else "AI Agents"
+        platform = posts[0].get("platform") if posts else None
+        if platform:
+            client.table("viral_posts").delete().eq("niche", niche).eq("platform", platform).execute()
+        client.table("viral_posts").insert(rows).execute()
+        print(f"  Wrote {len(rows)} viral posts to DB")

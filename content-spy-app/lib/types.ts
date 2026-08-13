@@ -74,6 +74,23 @@ export interface CompetitorWithPosts extends Competitor {
 
 export type ViewMode = 'competitor' | 'platform'
 export type Platform = 'youtube' | 'twitter' | 'instagram' | 'facebook'
+export type ViralPlatform = 'tiktok' | 'instagram' | 'facebook'
+export type DashboardTab = 'competitors' | 'viral'
+
+export interface ViralPost {
+  id: string
+  niche: string
+  platform: ViralPlatform
+  creator_name: string
+  creator_handle: string
+  caption: string | null
+  url: string
+  views: number
+  likes: number
+  estimated_reach: number
+  published_at: string | null
+  scraped_at: string
+}
 
 export interface ScrapeStatus {
   running: boolean
