@@ -16,6 +16,7 @@ export default function DashboardPage() {
   const [scraping, setScraping] = useState(false)
   const [scrapeMessage, setScrapeMessage] = useState<string | null>(null)
   const [scrapeError, setScrapeError] = useState<string | null>(null)
+  const [scrapeStartTime, setScrapeStartTime] = useState<number | null>(null)
 
   const loadData = useCallback(async () => {
     try {
@@ -60,17 +61,26 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!scraping) return
     const interval = setInterval(async () => {
+      if (!scraping) return
       try {
         const res = await fetch('/api/scrape')
         const json = await res.json()
-        if (!json.running) {
-          setScraping(false)
-          setScrapeMessage('Spy run complete! Refreshing data...')
-          setTimeout(() => {
-            loadData()
+        if (json.running === false && scraping) {
+          // GitHub Actions can take up to 20 seconds to register a new run.
+          // Don't trust a 'false' reading if we just started scraping recently.
+          const isRecentlyStarted = scrapeStartTime && (Date.now() - scrapeStartTime < 30000)
+          if (!isRecentlyStarted) {
+            setScraping(false)
             setScrapeMessage(null)
-          }, 2000)
-          clearInterval(interval)
+            loadData()
+            
+            // Show a success message temporarily
+            setScrapeMessage('✅ New data fetched successfully!')
+            setTimeout(() => {
+              setScrapeMessage(null)
+            }, 3000)
+            clearInterval(interval)
+          }
         }
       } catch {
         // Ignore polling errors
@@ -87,6 +97,7 @@ export default function DashboardPage() {
       const json = await res.json()
       if (res.ok && json.success) {
         setScraping(true)
+        setScrapeStartTime(Date.now())
         setScrapeMessage('🕵️ Spying in progress... This takes 3–5 minutes. You can keep browsing.')
       } else {
         setScrapeError(json.message || 'Failed to start scraper.')
