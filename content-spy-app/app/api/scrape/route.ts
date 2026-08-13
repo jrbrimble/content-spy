@@ -54,7 +54,7 @@ export async function POST() {
   }
 
   // Fallback to Local scraping
-  const scraperDir = process.env.SCRAPER_DIR || path.join(process.cwd(), '..')
+  const scraperDir = process.env.SCRAPER_DIR || path.join(process.cwd(), '..', 'scraper')
   
   isRunning = true
   lastStarted = new Date().toISOString()
