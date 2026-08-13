@@ -62,30 +62,49 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadData()
+
+    // Check if a scraper run is currently active on load/refresh
+    async function checkScraperStatus() {
+      try {
+        const res = await fetch('/api/scrape')
+        const json = await res.json()
+        if (json.running) {
+          setScraping(true)
+          setScrapeMessage('🕵️ Spying in progress... This takes 3–5 minutes. You can keep browsing.')
+        }
+      } catch (err) {
+        // ignore
+      }
+    }
+    checkScraperStatus()
+
+    // Periodic auto-refresh every 3 minutes to keep data fresh
+    const autoRefreshInterval = setInterval(() => {
+      loadData()
+    }, 180000)
+
+    return () => clearInterval(autoRefreshInterval)
   }, [loadData])
 
   // Poll for completion while scraping
   useEffect(() => {
     if (!scraping) return
     const interval = setInterval(async () => {
-      if (!scraping) return
       try {
         const res = await fetch('/api/scrape')
         const json = await res.json()
-        if (json.running === false && scraping) {
+        if (json.running === false) {
           // GitHub Actions can take up to 20 seconds to register a new run.
           // Don't trust a 'false' reading if we just started scraping recently.
           const isRecentlyStarted = scrapeStartTime && (Date.now() - scrapeStartTime < 30000)
           if (!isRecentlyStarted) {
             setScraping(false)
-            setScrapeMessage(null)
-            loadData()
+            setScrapeMessage('✅ New competitor data fetched successfully!')
+            await loadData()
             
-            // Show a success message temporarily
-            setScrapeMessage('✅ New data fetched successfully!')
             setTimeout(() => {
               setScrapeMessage(null)
-            }, 3000)
+            }, 5000)
             clearInterval(interval)
           }
         }
@@ -94,7 +113,7 @@ export default function DashboardPage() {
       }
     }, 5000)
     return () => clearInterval(interval)
-  }, [scraping, loadData])
+  }, [scraping, scrapeStartTime, loadData])
 
   const handleStartSpy = async () => {
     setScrapeError(null)
