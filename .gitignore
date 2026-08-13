@@ -5,6 +5,7 @@ __pycache__/
 *.json
 !package.json
 !vercel.json
+!content-spy-app/**/*.json
 *.pdf
 *.txt
 !requirements.txt
