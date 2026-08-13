@@ -73,7 +73,7 @@ export default function PlatformView({ competitors }: Props) {
               <div className={`bg-gradient-to-r ${gradient} px-4 py-3 flex items-center gap-3`}>
                 <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-xs overflow-hidden shrink-0 shadow-inner">
                   <img 
-                    src={`https://unavatar.io/youtube/${c.youtube_url.split('/').pop()}?fallback=false`}
+                    src={`https://unavatar.io/youtube/${(c.youtube_url || '').split('/').pop()}?fallback=false`}
                     alt={c.name}
                     className="w-full h-full object-cover"
                     onError={(e) => {
