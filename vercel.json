@@ -1,5 +1,0 @@
-{
-  "buildCommand": "cd content-spy-app && npm run build",
-  "outputDirectory": "content-spy-app/.next",
-  "framework": "nextjs"
-}
