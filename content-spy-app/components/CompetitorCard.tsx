@@ -9,6 +9,8 @@ import FacebookSection from './FacebookSection'
 
 interface Props {
   competitor: CompetitorWithPosts
+  onEdit?: (competitor: CompetitorWithPosts) => void
+  onDelete?: (competitor: CompetitorWithPosts) => void
 }
 
 const PLATFORMS = [
@@ -59,7 +61,7 @@ const GRADIENT_MAP: Record<string, string> = {
   'sean-standberry': 'from-amber-500 to-yellow-600',
 }
 
-export default function CompetitorCard({ competitor }: Props) {
+export default function CompetitorCard({ competitor, onEdit, onDelete }: Props) {
   const [activeTab, setActiveTab] = useState<string>('youtube')
   const [isExpanded, setIsExpanded] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
@@ -113,10 +115,45 @@ export default function CompetitorCard({ competitor }: Props) {
                 </div>
               </div>
             </div>
-            <div className={`w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+
+            <div className="flex items-center gap-2">
+              {onEdit && (
+                <div
+                  role="button"
+                  title="Edit Handles & URLs"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onEdit(competitor)
+                  }}
+                  className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm flex items-center justify-center text-white transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </div>
+              )}
+
+              {onDelete && (
+                <div
+                  role="button"
+                  title="Remove Competitor"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete(competitor)
+                  }}
+                  className="w-8 h-8 rounded-full bg-white/20 hover:bg-red-500/40 backdrop-blur-sm flex items-center justify-center text-white transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </div>
+              )}
+
+              <div className={`w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>

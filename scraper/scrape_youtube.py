@@ -3,19 +3,10 @@ YouTube scraper — fetches last 14 days of videos and writes to Supabase.
 """
 import datetime
 import yt_dlp
-from db_write import get_competitor_id, write_youtube_posts
+from db_write import get_client, write_youtube_posts
 
 CURRENT_DATE = datetime.datetime.now(datetime.timezone.utc)
 FOURTEEN_DAYS_AGO = CURRENT_DATE - datetime.timedelta(days=14)
-
-CHANNELS = {
-    "dan-martell":       "https://www.youtube.com/@danmartell",
-    "rick-mulready":     "https://www.youtube.com/@RickMulready",
-    "eric-siu":          "https://www.youtube.com/@LevelingUpOfficial",
-    "ai-show-podcast":   "https://www.youtube.com/@aishowpod",
-    "sabrina-ramonov":   "https://www.youtube.com/@sabrina_ramonov",
-    "sean-standberry":   "https://www.youtube.com/@SeanStandberry",
-}
 
 ydl_opts = {
     "extract_flat": True,
@@ -61,14 +52,24 @@ def fetch_youtube(slug: str, channel_url: str) -> list[dict]:
 
 def run():
     print("=== YouTube Scraper ===")
-    for slug, url in CHANNELS.items():
-        print(f"\nFetching: {slug}")
-        competitor_id = get_competitor_id(slug)
-        if not competitor_id:
-            print(f"  WARNING: Competitor not found in DB: {slug}")
+    client = get_client()
+    try:
+        competitors = client.table("competitors").select("id, name, slug, youtube_url").execute().data or []
+    except Exception as e:
+        print(f"  ERROR fetching competitors from DB: {e}")
+        return
+
+    for comp in competitors:
+        competitor_id = comp["id"]
+        slug = comp["slug"]
+        url = comp.get("youtube_url")
+        if not url:
+            print(f"\nSkipping {slug} (no YouTube URL configured)")
             continue
+
+        print(f"\nFetching YouTube for: {slug} ({url})")
         posts = fetch_youtube(slug, url)
-        print(f"  Found {len(posts)} video(s) in last 14 days")
+        print(f"  Found {len(posts)} video(s)")
         write_youtube_posts(competitor_id, posts)
     print("\nYouTube scraping complete.")
 

@@ -5,7 +5,7 @@ Detects Reels, fetches transcripts via Apify trakk actor, writes all to Supabase
 import os
 import datetime
 from apify_client import ApifyClient
-from db_write import get_competitor_id, write_instagram_posts, write_facebook_posts
+from db_write import get_client, get_competitor_id, write_instagram_posts, write_facebook_posts
 
 APIFY_TOKEN = os.environ.get("APIFY_API_KEY", "")
 client = ApifyClient(APIFY_TOKEN)
@@ -13,32 +13,24 @@ client = ApifyClient(APIFY_TOKEN)
 CURRENT_DATE = datetime.datetime.now(datetime.timezone.utc)
 THIRTY_DAYS_AGO = CURRENT_DATE - datetime.timedelta(days=30)
 
-PROFILES = {
-    "dan-martell": {
-        "instagram": "https://www.instagram.com/danmartell",
-        "facebook": "https://www.facebook.com/danmartell",
-    },
-    "rick-mulready": {
-        "instagram": "https://www.instagram.com/rickmulready",
-        "facebook": "https://www.facebook.com/rmulready",
-    },
-    "eric-siu": {
-        "instagram": "https://www.instagram.com/ericosiu",
-        "facebook": "https://www.facebook.com/singlegrain/",
-    },
-    "ai-show-podcast": {
-        "instagram": "https://www.instagram.com/aishowpod",
-        "facebook": "https://www.facebook.com/aishowpod",
-    },
-    "sabrina-ramonov": {
-        "instagram": "https://www.instagram.com/sabrina_ramonov",
-        "facebook": "https://www.facebook.com/sabr1naram",
-    },
-    "sean-standberry": {
-        "instagram": "https://www.instagram.com/lyfemarketing",
-        "facebook": "https://www.facebook.com/lyfemarketing/",
-    },
-}
+
+def load_profiles() -> dict[str, dict]:
+    db = get_client()
+    try:
+        competitors = db.table("competitors").select("id, name, slug, instagram_url, facebook_url").execute().data or []
+    except Exception as e:
+        print(f"  ERROR loading competitors from DB: {e}")
+        return {}
+
+    profiles = {}
+    for comp in competitors:
+        slug = comp["slug"]
+        profiles[slug] = {
+            "instagram": comp.get("instagram_url") or "",
+            "facebook": comp.get("facebook_url") or "",
+            "name": comp.get("name") or "",
+        }
+    return profiles
 
 
 def _get_dataset_id(run):
@@ -61,9 +53,13 @@ def parse_ts(ts) -> datetime.datetime | None:
 
 # ─── Instagram ───────────────────────────────────────────────
 
-def scrape_instagram() -> dict[str, list[dict]]:
+def scrape_instagram(profiles: dict[str, dict]) -> dict[str, list[dict]]:
     print("Launching Apify Instagram scraper for all profiles...")
-    ig_urls = [data["instagram"] for data in PROFILES.values()]
+    ig_urls = [data["instagram"] for data in profiles.values() if data.get("instagram")]
+    if not ig_urls:
+        print("  No Instagram URLs configured.")
+        return {slug: [] for slug in profiles}
+
     run_input = {
         "directUrls": ig_urls,
         "resultsType": "posts",
@@ -73,7 +69,7 @@ def scrape_instagram() -> dict[str, list[dict]]:
     items = list(client.dataset(_get_dataset_id(run)).iterate_items())
     print(f"  Total IG items fetched: {len(items)}")
 
-    results: dict[str, list[dict]] = {slug: [] for slug in PROFILES}
+    results: dict[str, list[dict]] = {slug: [] for slug in profiles}
 
     for item in items:
         owner = (item.get("ownerUsername") or "").lower()
@@ -81,9 +77,11 @@ def scrape_instagram() -> dict[str, list[dict]]:
         item_url = (item.get("url") or "").lower()
 
         slug = None
-        for s, data in PROFILES.items():
+        for s, data in profiles.items():
+            if not data.get("instagram"):
+                continue
             handle = data["instagram"].rstrip("/").split("/")[-1].lower()
-            if handle in owner or handle in input_url or handle in item_url:
+            if handle and (handle in owner or handle in input_url or handle in item_url):
                 slug = s
                 break
         if not slug:
@@ -188,9 +186,13 @@ def fetch_reel_transcripts(ig_results: dict[str, list[dict]]) -> dict[str, list[
 
 # ─── Facebook ────────────────────────────────────────────────
 
-def scrape_facebook() -> dict[str, list[dict]]:
+def scrape_facebook(profiles: dict[str, dict]) -> dict[str, list[dict]]:
     print("Launching Apify Facebook scraper for all pages...")
-    fb_urls = [{"url": data["facebook"]} for data in PROFILES.values()]
+    fb_urls = [{"url": data["facebook"]} for data in profiles.values() if data.get("facebook")]
+    if not fb_urls:
+        print("  No Facebook URLs configured.")
+        return {slug: [] for slug in profiles}
+
     run_input = {
         "startUrls": fb_urls,
         "resultsLimit": 15,
@@ -199,25 +201,21 @@ def scrape_facebook() -> dict[str, list[dict]]:
     items = list(client.dataset(_get_dataset_id(run)).iterate_items())
     print(f"  Total FB items fetched: {len(items)}")
 
-    results: dict[str, list[dict]] = {slug: [] for slug in PROFILES}
+    results: dict[str, list[dict]] = {slug: [] for slug in profiles}
 
     for item in items:
         fb_url = (item.get("facebookUrl") or item.get("inputUrl") or item.get("url") or "").lower()
         user_name = (item.get("user", {}).get("name") or item.get("pageName") or "").lower()
 
         slug = None
-        if "danmartell" in fb_url or "dan martell" in user_name:
-            slug = "dan-martell"
-        elif "rmulready" in fb_url or "rick mulready" in user_name or "rickmulready" in fb_url:
-            slug = "rick-mulready"
-        elif "singlegrain" in fb_url or "single grain" in user_name or "eric siu" in user_name or "ericosiu" in fb_url:
-            slug = "eric-siu"
-        elif "aishowpod" in fb_url or "ai show" in user_name or "aishow" in fb_url:
-            slug = "ai-show-podcast"
-        elif "sabr1naram" in fb_url or "sabrina ramonov" in user_name or "sabrina_ramonov" in fb_url:
-            slug = "sabrina-ramonov"
-        elif "lyfemarketing" in fb_url or "lyfe marketing" in user_name or "sean standberry" in user_name or "seanstandberry" in fb_url:
-            slug = "sean-standberry"
+        for s, data in profiles.items():
+            if not data.get("facebook"):
+                continue
+            handle = data["facebook"].rstrip("/").split("/")[-1].lower()
+            name_kw = data.get("name", "").lower()
+            if handle and (handle in fb_url or handle in user_name) or (name_kw and name_kw in user_name):
+                slug = s
+                break
 
         if not slug:
             continue
@@ -253,10 +251,14 @@ def scrape_facebook() -> dict[str, list[dict]]:
 
 def run():
     print("=== Instagram + Facebook Scraper ===\n")
+    profiles = load_profiles()
+    if not profiles:
+        print("  WARNING: No active profiles loaded from DB.")
+        return
 
     # Instagram
     print("--- Instagram ---")
-    ig_results = scrape_instagram()
+    ig_results = scrape_instagram(profiles)
     ig_results = fetch_reel_transcripts(ig_results)
 
     for slug, posts in ig_results.items():
@@ -269,7 +271,7 @@ def run():
 
     # Facebook
     print("\n--- Facebook ---")
-    fb_results = scrape_facebook()
+    fb_results = scrape_facebook(profiles)
 
     for slug, posts in fb_results.items():
         competitor_id = get_competitor_id(slug)

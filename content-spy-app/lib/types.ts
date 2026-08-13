@@ -11,6 +11,14 @@ export interface Competitor {
   last_scraped_at: string | null
 }
 
+export interface CompetitorInput {
+  name: string
+  youtube_url?: string
+  twitter_url?: string
+  instagram_url?: string
+  facebook_url?: string
+}
+
 export interface YouTubePost {
   id: string
   competitor_id: string

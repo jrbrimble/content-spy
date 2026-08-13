@@ -50,3 +50,48 @@ export async function getAllCompetitorsWithPosts(): Promise<CompetitorWithPosts[
 
   return results
 }
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+export async function addCompetitor(input: import('./types').CompetitorInput): Promise<{ success: boolean; error?: string }> {
+  const slug = slugify(input.name)
+  const { error } = await supabase.from('competitors').insert({
+    name: input.name.trim(),
+    slug: slug || `comp-${Date.now()}`,
+    youtube_url: input.youtube_url?.trim() || null,
+    twitter_url: input.twitter_url?.trim() || null,
+    instagram_url: input.instagram_url?.trim() || null,
+    facebook_url: input.facebook_url?.trim() || null,
+  })
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function updateCompetitor(id: string, input: import('./types').CompetitorInput): Promise<{ success: boolean; error?: string }> {
+  const slug = slugify(input.name)
+  const { error } = await supabase.from('competitors').update({
+    name: input.name.trim(),
+    slug: slug || `comp-${Date.now()}`,
+    youtube_url: input.youtube_url?.trim() || null,
+    twitter_url: input.twitter_url?.trim() || null,
+    instagram_url: input.instagram_url?.trim() || null,
+    facebook_url: input.facebook_url?.trim() || null,
+  }).eq('id', id)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function deleteCompetitor(id: string): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabase.from('competitors').delete().eq('id', id)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
