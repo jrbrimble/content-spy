@@ -56,7 +56,7 @@ async function runApifyActor(actorId: string, input: object): Promise<unknown[]>
     const { status, defaultDatasetId } = statusData.data
     if (status === 'SUCCEEDED') {
       const dataRes = await fetch(
-        `https://api.apify.com/v2/datasets/${defaultDatasetId}/items?token=${APIFY_TOKEN}&limit=50`
+        `https://api.apify.com/v2/datasets/${defaultDatasetId}/items?token=${APIFY_TOKEN}&limit=100`
       )
       return await dataRes.json() as unknown[]
     }
@@ -84,37 +84,50 @@ function isWithinLastNDays(ts: number | string | undefined, days: number): boole
   if (!ts) return false
   const d = new Date(typeof ts === 'number' && ts < 1e12 ? ts * 1000 : ts)
   if (isNaN(d.getTime())) return false
-  return d >= sevenDaysAgo()
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - days)
+  return d >= cutoff
 }
 
 // ─── TikTok scrape ────────────────────────────────────────────────────────
+// Uses clockworks/tiktok-scraper with hashtag input (most reliable for keyword discovery)
 async function scrapeTikTok(niche: string): Promise<ViralResult[]> {
-  // clockworks/tiktok-scraper supports searchQueries
+  // Convert niche to hashtag format (remove spaces, lowercase)
+  const hashtag = niche.replace(/\s+/g, '').toLowerCase()
+
   const items = await runApifyActor('clockworks~tiktok-scraper', {
-    searchQueries: [niche],
-    searchSection: 'videos',
-    maxResults: 30,
+    hashtags: [hashtag],
+    resultsPerPage: 30,
     shouldDownloadVideos: false,
     shouldDownloadCovers: false,
-    proxyConfiguration: { useApifyProxy: true },
+    shouldDownloadSubtitles: false,
+    shouldDownloadSlideshowImages: false,
+    shouldDownloadAvatars: false,
+    scrapeRelatedVideos: false,
+    excludePinnedPosts: false,
   })
 
-  const sevenDaysAgoDate = sevenDaysAgo()
+  console.log(`[TikTok] Got ${items.length} raw items for hashtag #${hashtag}`)
 
   const results: ViralResult[] = []
   for (const item of items as Record<string, unknown>[]) {
-    const createTime = item.createTime as number | undefined
-    if (!isWithinLastNDays(createTime, 7)) continue
+    // createTime is unix seconds; createTimeISO is ISO string
+    const createTime = (item.createTime as number) || undefined
+    const createTimeISO = (item.createTimeISO as string) || undefined
+    const ts = createTimeISO || createTime
 
-    const playCount = (item.playCount as number) || (item.stats as Record<string, number>)?.playCount || 0
-    const diggCount = (item.diggCount as number) || (item.stats as Record<string, number>)?.diggCount || 0
+    const playCount = (item.playCount as number) || 0
+    const diggCount = (item.diggCount as number) || 0
     const webVideoUrl = (item.webVideoUrl as string) || ''
-    const authorMeta = item.authorMeta as Record<string, string> | undefined
-    const desc = (item.text as string) || (item.desc as string) || ''
-    const username = authorMeta?.name || authorMeta?.uniqueId || 'unknown'
-    const nickname = authorMeta?.nickName || authorMeta?.name || username
 
-    if (!webVideoUrl || playCount === 0) continue
+    // authorMeta is nested object
+    const authorMeta = item.authorMeta as Record<string, string | number | boolean> | undefined
+    const username = (authorMeta?.name as string) || 'unknown'
+    const nickname = (authorMeta?.nickName as string) || username
+    const desc = (item.text as string) || ''
+
+    if (!webVideoUrl) continue
+    if (playCount === 0) continue
 
     results.push({
       id: `tt-${(item.id as string) || Math.random().toString(36).slice(2)}`,
@@ -122,67 +135,80 @@ async function scrapeTikTok(niche: string): Promise<ViralResult[]> {
       platform: 'tiktok',
       creator_name: nickname,
       creator_handle: `@${username}`,
-      caption: desc.slice(0, 200),
+      caption: desc.slice(0, 250),
       url: webVideoUrl,
       views: playCount,
       likes: diggCount,
       estimated_reach: Math.round(playCount * 1.45),
-      published_at: isoDate(createTime),
+      published_at: isoDate(ts),
       scraped_at: new Date().toISOString(),
     })
   }
 
+  // Sort by views desc, return top 5
   return results
     .sort((a, b) => b.views - a.views)
     .slice(0, 5)
 }
 
-// ─── Instagram scrape ─────────────────────────────────────────────────────
+// ─── Instagram Reels scrape ───────────────────────────────────────────────
+// Uses apify/instagram-scraper with hashtag explore URL + resultsType: reels
 async function scrapeInstagram(niche: string): Promise<ViralResult[]> {
-  // apify/instagram-scraper with hashtag mode
-  // Strip spaces to form a hashtag (e.g. "AI Agents" → "AIAgents")
-  const hashtag = niche.replace(/\s+/g, '')
+  // Use the hashtag explore URL — no spaces, just the term
+  const hashtag = niche.replace(/\s+/g, '').toLowerCase()
+  const hashtagUrl = `https://www.instagram.com/explore/tags/${encodeURIComponent(hashtag)}/`
 
   const items = await runApifyActor('apify~instagram-scraper', {
-    directUrls: [`https://www.instagram.com/explore/tags/${encodeURIComponent(hashtag)}/`],
-    resultsType: 'posts',
+    directUrls: [hashtagUrl],
+    resultsType: 'reels',
     resultsLimit: 30,
     addParentData: false,
-    proxy: { useApifyProxy: true, apifyProxyGroups: ['RESIDENTIAL'] },
   })
+
+  console.log(`[Instagram] Got ${items.length} raw items for #${hashtag}`)
 
   const results: ViralResult[] = []
   for (const item of items as Record<string, unknown>[]) {
-    const timestamp = (item.timestamp as string) || (item.taken_at_timestamp as number)?.toString()
-    if (!isWithinLastNDays(timestamp, 7)) continue
+    // Instagram reels output fields from the docs:
+    // url: "https://www.instagram.com/p/DZN3mhZBQ_Q/" (uses /p/ even for reels)
+    // shortCode: "DZN3mhZBQ_Q"
+    // videoPlayCount: number (total plays)
+    // videoViewCount: number
+    // likesCount: number
+    // timestamp: "2026-06-05T19:58:30.000Z"
+    // ownerUsername, ownerFullName
+    // type: "Video"
+    // productType: "clips" (for reels)
 
-    // Only keep video/reel posts
-    const type = (item.type as string) || ''
-    const isVideo = type === 'Video' || type === 'Reel' || (item.isVideo as boolean) === true
-    if (!isVideo) continue
-
+    const timestamp = (item.timestamp as string) || undefined
     const videoPlayCount = (item.videoPlayCount as number) || (item.videoViewCount as number) || 0
-    const likesCount = (item.likesCount as number) || (item.likesCount as number) || 0
-    const url = (item.url as string) || ''
+    const likesCount = (item.likesCount as number) || 0
     const shortCode = (item.shortCode as string) || ''
-    const reelUrl = url || (shortCode ? `https://www.instagram.com/reel/${shortCode}/` : '')
-    const ownerUsername = (item.ownerUsername as string) || (item.ownerId as string) || 'unknown'
+    const ownerUsername = (item.ownerUsername as string) || 'unknown'
     const ownerFullName = (item.ownerFullName as string) || ownerUsername
-    const caption = ((item.caption as string) || '').slice(0, 200)
+    const caption = ((item.caption as string) || '').slice(0, 250)
+    const type = (item.type as string) || ''
 
-    if (!reelUrl || videoPlayCount === 0) continue
+    // Build direct reel URL from shortCode — Instagram reels use /reel/ path
+    const reelUrl = shortCode
+      ? `https://www.instagram.com/reel/${shortCode}/`
+      : (item.url as string) || ''
+
+    // Only keep video items with some plays
+    if (!reelUrl || type === 'Image') continue
+    if (videoPlayCount === 0 && likesCount === 0) continue
 
     results.push({
-      id: `ig-${(item.id as string) || Math.random().toString(36).slice(2)}`,
+      id: `ig-${(item.id as string) || shortCode || Math.random().toString(36).slice(2)}`,
       niche,
       platform: 'instagram',
       creator_name: ownerFullName,
       creator_handle: `@${ownerUsername}`,
       caption,
       url: reelUrl,
-      views: videoPlayCount,
+      views: videoPlayCount || likesCount * 8, // fallback estimate if views not available
       likes: likesCount,
-      estimated_reach: Math.round(videoPlayCount * 1.5),
+      estimated_reach: Math.round((videoPlayCount || likesCount * 8) * 1.5),
       published_at: isoDate(timestamp),
       scraped_at: new Date().toISOString(),
     })
@@ -220,15 +246,21 @@ export async function POST(req: Request) {
     }
 
     // Run TikTok + Instagram in parallel
-    const [tiktokPosts, instagramPosts] = await Promise.allSettled([
+    const [tiktokResult, instagramResult] = await Promise.allSettled([
       scrapeTikTok(niche),
       scrapeInstagram(niche),
     ])
 
-    const posts: ViralResult[] = [
-      ...(tiktokPosts.status === 'fulfilled' ? tiktokPosts.value : []),
-      ...(instagramPosts.status === 'fulfilled' ? instagramPosts.value : []),
-    ]
+    const tiktokPosts = tiktokResult.status === 'fulfilled' ? tiktokResult.value : []
+    const instagramPosts = instagramResult.status === 'fulfilled' ? instagramResult.value : []
+    const posts: ViralResult[] = [...tiktokPosts, ...instagramPosts]
+
+    const errors = {
+      tiktok: tiktokResult.status === 'rejected' ? (tiktokResult.reason as Error).message : null,
+      instagram: instagramResult.status === 'rejected' ? (instagramResult.reason as Error).message : null,
+    }
+
+    console.log(`[viral-search] "${niche}": ${tiktokPosts.length} TikTok, ${instagramPosts.length} Instagram posts`)
 
     // Cache the result
     cache.set(cacheKey, { data: posts, cachedAt: Date.now() })
@@ -238,10 +270,7 @@ export async function POST(req: Request) {
       niche,
       posts,
       cached: false,
-      errors: {
-        tiktok: tiktokPosts.status === 'rejected' ? (tiktokPosts.reason as Error).message : null,
-        instagram: instagramPosts.status === 'rejected' ? (instagramPosts.reason as Error).message : null,
-      },
+      errors,
     })
   } catch (err) {
     console.error('[viral-search]', err)
