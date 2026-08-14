@@ -176,9 +176,11 @@ export default function DashboardPage() {
             <div className="flex flex-col sm:flex-row sm:items-center gap-4">
               <div>
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-violet-500/20">
-                    🕵️
-                  </div>
+                  <img
+                    src="/logo.webp"
+                    alt="Content Spy Logo"
+                    className="w-8 h-8 rounded-xl object-cover shadow-lg shadow-violet-500/20 border border-slate-700/50"
+                  />
                   <h1 className="text-xl font-bold text-white tracking-tight">Content Spy</h1>
                 </div>
                 <p className="text-slate-400 text-xs mt-1">

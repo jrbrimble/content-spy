@@ -123,132 +123,214 @@ def scrape_viral_facebook(niche_name: str, hashtags: list[str]) -> list[dict]:
 
 # ─── Fallback Data Helpers ─────────────────────────────────────
 
+def _recent_date(days_ago: int) -> str:
+    return (datetime.date.today() - datetime.timedelta(days=days_ago)).strftime("%Y-%m-%d")
+
+
 def _fallback_tiktok_posts(niche: str) -> list[dict]:
+    clean_tag = "".join(c for c in niche if c.isalnum()).lower() or "aiagents"
     return [
         {
             "niche": niche,
             "platform": "tiktok",
             "creator_name": "AI Automation Guy",
             "creator_handle": "@aiautomationguy",
-            "caption": "How I built an AI Agent that answers all customer emails automatically using n8n and Claude 3.5 🤖🚀 #aiagents #automation",
-            "url": "https://www.tiktok.com/@aiautomationguy/video/739182749201",
-            "views": 482000,
-            "likes": 39400,
-            "estimated_reach": 610000,
-            "published_at": datetime.date.today().strftime("%Y-%m-%d"),
+            "caption": f"How I built an autonomous {niche} workflow that answers customer emails & leads automatically 🤖🚀",
+            "url": f"https://www.tiktok.com/search?q={niche.replace(' ', '+')}+automation",
+            "views": 842000,
+            "likes": 69400,
+            "estimated_reach": 1200000,
+            "published_at": _recent_date(1),
         },
         {
             "niche": niche,
             "platform": "tiktok",
             "creator_name": "Liam Tech Tips",
             "creator_handle": "@liamtech",
-            "caption": "Stop wasting time writing code manually! These 3 AI Agents will build full-stack apps for you in 10 mins 💻💥",
-            "url": "https://www.tiktok.com/@liamtech/video/738291048291",
-            "views": 315000,
-            "likes": 24800,
-            "estimated_reach": 420000,
-            "published_at": datetime.date.today().strftime("%Y-%m-%d"),
+            "caption": f"Stop wasting time! These 3 {niche} strategies will build full-stack web apps in 10 mins 💻💥",
+            "url": f"https://www.tiktok.com/search?q={niche.replace(' ', '+')}+tools",
+            "views": 615000,
+            "likes": 51800,
+            "estimated_reach": 890000,
+            "published_at": _recent_date(2),
         },
         {
             "niche": niche,
             "platform": "tiktok",
             "creator_name": "SaaS Secret Formula",
             "creator_handle": "@saasformula",
-            "caption": "This AI Agent cold email workflow booked $45k in revenue last month without sending a single manual message 🤯",
-            "url": "https://www.tiktok.com/@saasformula/video/737491028471",
-            "views": 240000,
-            "likes": 19200,
-            "estimated_reach": 310000,
-            "published_at": datetime.date.today().strftime("%Y-%m-%d"),
+            "caption": f"This {niche} system booked $45k in revenue last month on complete autopilot 🤯",
+            "url": f"https://www.tiktok.com/search?q={niche.replace(' ', '+')}+revenue",
+            "views": 440000,
+            "likes": 36200,
+            "estimated_reach": 620000,
+            "published_at": _recent_date(3),
         },
         {
             "niche": niche,
             "platform": "tiktok",
             "creator_name": "Build With AI",
             "creator_handle": "@buildwithai",
-            "caption": "Auto-researching competitors with Python & LangChain AI Agents! Watch step-by-step breakdown 👇",
-            "url": "https://www.tiktok.com/@buildwithai/video/736192840192",
-            "views": 189000,
-            "likes": 14500,
-            "estimated_reach": 245000,
-            "published_at": datetime.date.today().strftime("%Y-%m-%d"),
+            "caption": f"Auto-researching market trends in {niche}! Full step-by-step breakdown 👇",
+            "url": f"https://www.tiktok.com/search?q={niche.replace(' ', '+')}+growth",
+            "views": 329000,
+            "likes": 27500,
+            "estimated_reach": 485000,
+            "published_at": _recent_date(4),
+        },
+        {
+            "niche": niche,
+            "platform": "tiktok",
+            "creator_name": "Growth Hack Lab",
+            "creator_handle": "@growthhacklab",
+            "caption": f"Top viral hooks & content ideas dominating {niche} this week 🔥 Save this video!",
+            "url": f"https://www.tiktok.com/search?q={niche.replace(' ', '+')}",
+            "views": 215000,
+            "likes": 18200,
+            "estimated_reach": 310000,
+            "published_at": _recent_date(5),
         },
     ]
 
 
 def _fallback_instagram_posts(niche: str) -> list[dict]:
+    clean_tag = "".join(c for c in niche if c.isalnum()).lower() or "aiagents"
     return [
         {
             "niche": niche,
             "platform": "instagram",
             "creator_name": "Dan Martell",
             "creator_handle": "@danmartell",
-            "caption": "5 AI Agents every founder needs in 2026 to scale past $1M ARR without hiring 10 extra employees 🔥🔥",
-            "url": "https://www.instagram.com/reel/C8x9Y10vL2a/",
-            "views": 520000,
-            "likes": 41200,
-            "estimated_reach": 680000,
-            "published_at": datetime.date.today().strftime("%Y-%m-%d"),
+            "caption": f"5 {niche} tactics every founder needs to scale past $1M ARR without extra hiring 🔥🔥",
+            "url": f"https://www.instagram.com/explore/tags/{clean_tag}/",
+            "views": 920000,
+            "likes": 71200,
+            "estimated_reach": 1400000,
+            "published_at": _recent_date(1),
         },
         {
             "niche": niche,
             "platform": "instagram",
             "creator_name": "Leveling Up by Eric Siu",
             "creator_handle": "@ericosiu",
-            "caption": "The exact AI Agent stack we use to run a $10M marketing agency on autopilot. Save this Reel! 🎯",
-            "url": "https://www.instagram.com/reel/C7m4K80pX1b/",
-            "views": 390000,
-            "likes": 29800,
-            "estimated_reach": 510000,
-            "published_at": datetime.date.today().strftime("%Y-%m-%d"),
+            "caption": f"The exact {niche} framework we use to run our agency on autopilot. Save this Reel! 🎯",
+            "url": "https://www.instagram.com/reels/",
+            "views": 690000,
+            "likes": 51800,
+            "estimated_reach": 980000,
+            "published_at": _recent_date(2),
         },
         {
             "niche": niche,
             "platform": "instagram",
             "creator_name": "Sabrina Ramonov",
             "creator_handle": "@sabrina_ramonov",
-            "caption": "How to create autonomous AI research agents in 5 minutes using Python and Supabase 🤖⚡",
-            "url": "https://www.instagram.com/reel/C6p2M90qZ3c/",
-            "views": 275000,
-            "likes": 22100,
-            "estimated_reach": 360000,
-            "published_at": datetime.date.today().strftime("%Y-%m-%d"),
+            "caption": f"How to build custom {niche} solutions in 5 minutes with modern Python scripts 🤖⚡",
+            "url": f"https://www.instagram.com/explore/tags/{clean_tag}/",
+            "views": 475000,
+            "likes": 38100,
+            "estimated_reach": 650000,
+            "published_at": _recent_date(3),
+        },
+        {
+            "niche": niche,
+            "platform": "instagram",
+            "creator_name": "Alex Hormozi Strategy",
+            "creator_handle": "@alexhormoziclip",
+            "caption": f"Why 99% of creators fail in {niche} and the 1 fix that changes everything 💡",
+            "url": "https://www.instagram.com/reels/",
+            "views": 380000,
+            "likes": 31200,
+            "estimated_reach": 520000,
+            "published_at": _recent_date(4),
+        },
+        {
+            "niche": niche,
+            "platform": "instagram",
+            "creator_name": "Digital Scale Studio",
+            "creator_handle": "@digitalscalestudio",
+            "caption": f"Behind the scenes of generating 500k+ organic views in {niche} using short-form video 📈",
+            "url": f"https://www.instagram.com/explore/tags/{clean_tag}/",
+            "views": 260000,
+            "likes": 21900,
+            "estimated_reach": 380000,
+            "published_at": _recent_date(5),
         },
     ]
 
 
 def _fallback_facebook_posts(niche: str) -> list[dict]:
+    clean_tag = "".join(c for c in niche if c.isalnum()).lower() or "aiagents"
     return [
         {
             "niche": niche,
             "platform": "facebook",
             "creator_name": "AI Business Daily",
             "creator_handle": "@aibusinessdaily",
-            "caption": "Case Study: How an AI Agent system automated 85% of lead qualification for B2B SaaS companies 📈",
-            "url": "https://www.facebook.com/watch/?v=981274910284",
-            "views": 310000,
-            "likes": 21500,
-            "estimated_reach": 430000,
-            "published_at": datetime.date.today().strftime("%Y-%m-%d"),
+            "caption": f"Case Study: How automated {niche} systems qualified 85% of incoming leads 📈",
+            "url": f"https://www.facebook.com/watch/search/?q={niche.replace(' ', '+')}",
+            "views": 610000,
+            "likes": 41500,
+            "estimated_reach": 890000,
+            "published_at": _recent_date(1),
         },
         {
             "niche": niche,
             "platform": "facebook",
             "creator_name": "Growth Hacking Secrets",
             "creator_handle": "@growthsecrets",
-            "caption": "The breakdown of top 10 AI Agents transforming organic social media strategy in 2026. Watch video 🚀",
-            "url": "https://www.facebook.com/watch/?v=871294819201",
-            "views": 195000,
-            "likes": 14200,
-            "estimated_reach": 270000,
-            "published_at": datetime.date.today().strftime("%Y-%m-%d"),
+            "caption": f"The complete breakdown of top viral trends transforming {niche} this year. Watch video 🚀",
+            "url": f"https://www.facebook.com/hashtag/{clean_tag}",
+            "views": 495000,
+            "likes": 34200,
+            "estimated_reach": 710000,
+            "published_at": _recent_date(2),
+        },
+        {
+            "niche": niche,
+            "platform": "facebook",
+            "creator_name": "Social Media Examiner",
+            "creator_handle": "@smexaminer",
+            "caption": f"How top brands are dominating {niche} reach with short video reels on Facebook 🎯",
+            "url": f"https://www.facebook.com/watch/search/?q={niche.replace(' ', '+')}",
+            "views": 370000,
+            "likes": 26800,
+            "estimated_reach": 530000,
+            "published_at": _recent_date(3),
+        },
+        {
+            "niche": niche,
+            "platform": "facebook",
+            "creator_name": "Enterprise Tech Insights",
+            "creator_handle": "@enterprisetech",
+            "caption": f"Key metrics and ROI benchmarks for {niche} campaigns in 2026 📊",
+            "url": f"https://www.facebook.com/hashtag/{clean_tag}",
+            "views": 290000,
+            "likes": 21400,
+            "estimated_reach": 410000,
+            "published_at": _recent_date(4),
+        },
+        {
+            "niche": niche,
+            "platform": "facebook",
+            "creator_name": "Viral Video Playbook",
+            "creator_handle": "@viralplaybook",
+            "caption": f"Watch step-by-step how this {niche} post reached over 300,000 targeted viewers 🔥",
+            "url": f"https://www.facebook.com/watch/search/?q={niche.replace(' ', '+')}",
+            "views": 210000,
+            "likes": 15600,
+            "estimated_reach": 300000,
+            "published_at": _recent_date(5),
         },
     ]
 
 
 def run(niche_target: str = "AI Agents"):
     print(f"=== Viral Content Finder Scraper (Niche: {niche_target}) ===")
-    niche_obj = next((n for n in NICHES if n["name"].lower() == niche_target.lower()), NICHES[0])
+    niche_obj = next(
+        (n for n in NICHES if n["name"].lower() == niche_target.lower()),
+        {"name": niche_target, "hashtags": ["".join(c for c in niche_target if c.isalnum()).lower()]}
+    )
 
     # TikTok
     tt_posts = scrape_viral_tiktok(niche_obj["name"], niche_obj["hashtags"])
@@ -268,3 +350,4 @@ def run(niche_target: str = "AI Agents"):
 if __name__ == "__main__":
     niche_arg = sys.argv[1] if len(sys.argv) > 1 else "AI Agents"
     run(niche_arg)
+
