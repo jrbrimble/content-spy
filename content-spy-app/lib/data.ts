@@ -114,3 +114,27 @@ export async function getViralPosts(niche: string = 'AI Agents'): Promise<import
   return []
 }
 
+export async function getLatestViralPosts(): Promise<{ posts: import('./types').ViralPost[]; niche: string; scrapedAt: string } | null> {
+  try {
+    const { data, error } = await supabase
+      .from('viral_posts')
+      .select('*')
+      .order('scraped_at', { ascending: false })
+      .limit(30)
+
+    if (!error && data && data.length > 0) {
+      const niche = data[0]?.niche || 'AI Agents'
+      const scrapedAt = data[0]?.scraped_at || new Date().toISOString()
+      return {
+        posts: data as import('./types').ViralPost[],
+        niche,
+        scrapedAt,
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching latest viral posts from Supabase:', err)
+  }
+  return null
+}
+
+

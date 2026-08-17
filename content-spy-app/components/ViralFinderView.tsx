@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { ViralPost, ViralPlatform } from '@/lib/types'
-import { getViralPosts } from '@/lib/data'
+import { getViralPosts, getLatestViralPosts } from '@/lib/data'
 import { formatDateTime } from '@/lib/utils'
 import ViralPostCard from './ViralPostCard'
 
@@ -29,10 +29,10 @@ export default function ViralFinderView() {
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Load saved niches and last scraped data from localStorage on mount
+  // Load saved niches and last scraped data from localStorage or Supabase on mount
   useEffect(() => {
     try {
-      // 1. Load niches
+      // 1. Load niches from localStorage if present
       const savedNiches = localStorage.getItem('content_spy_niches')
       let currentNiche = selectedNiche
       if (savedNiches) {
@@ -49,11 +49,10 @@ export default function ViralFinderView() {
       // Clear legacy mock cache if present
       localStorage.removeItem('content_spy_viral_cache')
 
-      // 2. Load last scraped viral data (v2 live only)
+      // 2. Load last scraped viral data (v2 live only) from localStorage
       const savedViral = localStorage.getItem('content_spy_viral_live_v2')
       if (savedViral) {
         const parsedData: ViralStorageData = JSON.parse(savedViral)
-        // Discard if empty or contains legacy mock IDs
         const isMock = parsedData?.posts?.some(p => p.id?.startsWith('tt-aiagents-') || p.id?.startsWith('ig-aiagents-'))
         if (parsedData && Array.isArray(parsedData.posts) && parsedData.posts.length > 0 && !isMock) {
           setPosts(parsedData.posts)
@@ -64,22 +63,25 @@ export default function ViralFinderView() {
         }
       }
 
-      // 3. If no localStorage data yet, query Supabase for real live posts
-      getViralPosts(currentNiche).then(livePosts => {
-        const isMock = livePosts?.some(p => p.id?.startsWith('tt-aiagents-') || p.id?.startsWith('ig-aiagents-'))
-        if (livePosts && livePosts.length > 0 && !isMock) {
-          const now = new Date().toISOString()
-          setPosts(livePosts)
-          setLastSearchedNiche(currentNiche)
-          setScrapedAt(livePosts[0]?.scraped_at || now)
-          setSearchStatus('done')
-          try {
-            localStorage.setItem('content_spy_viral_live_v2', JSON.stringify({
-              posts: livePosts,
-              lastSearchedNiche: currentNiche,
-              scrapedAt: livePosts[0]?.scraped_at || now,
-            }))
-          } catch { /* ignore */ }
+      // 3. If no localStorage data yet (e.g. Incognito or fresh session), fetch latest from Supabase
+      getLatestViralPosts().then(latest => {
+        if (latest && latest.posts.length > 0) {
+          const isMock = latest.posts.some(p => p.id?.startsWith('tt-aiagents-') || p.id?.startsWith('ig-aiagents-'))
+          if (!isMock) {
+            setPosts(latest.posts)
+            setLastSearchedNiche(latest.niche)
+            setScrapedAt(latest.scrapedAt)
+            setSearchStatus('done')
+            setSelectedNiche(latest.niche)
+            setNiches(prev => prev.includes(latest.niche) ? prev : [latest.niche, ...prev])
+            try {
+              localStorage.setItem('content_spy_viral_live_v2', JSON.stringify({
+                posts: latest.posts,
+                lastSearchedNiche: latest.niche,
+                scrapedAt: latest.scrapedAt,
+              }))
+            } catch { /* ignore */ }
+          }
         }
       }).catch(() => { /* ignore */ })
     } catch { /* ignore */ }

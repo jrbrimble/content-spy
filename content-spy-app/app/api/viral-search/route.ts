@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { supabase } from '@/lib/supabase'
 
 const APIFY_TOKEN = process.env.APIFY_API_KEY || ''
 const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
@@ -337,8 +338,31 @@ export async function POST(req: Request) {
 
     console.log(`[viral-search] "${niche}": ${tiktokPosts.length} TikTok, ${instagramPosts.length} Instagram English posts from last 7 days`)
 
-    // Cache the result
+    // Cache the result in-memory
     cache.set(cacheKey, { data: posts, cachedAt: Date.now() })
+
+    // Persist to Supabase viral_posts table for global multi-browser sync
+    if (posts.length > 0) {
+      try {
+        await supabase.from('viral_posts').delete().ilike('niche', `%${niche}%`)
+        const rows = posts.map(p => ({
+          niche: p.niche,
+          platform: p.platform,
+          creator_name: p.creator_name,
+          creator_handle: p.creator_handle,
+          caption: p.caption,
+          url: p.url,
+          views: p.views,
+          likes: p.likes,
+          estimated_reach: p.estimated_reach,
+          published_at: p.published_at,
+          scraped_at: p.scraped_at,
+        }))
+        await supabase.from('viral_posts').insert(rows)
+      } catch (dbErr) {
+        console.warn('[viral-search] Supabase write notice:', dbErr)
+      }
+    }
 
     return NextResponse.json({
       success: true,
