@@ -68,12 +68,6 @@ async function runApifyActor(actorId: string, input: object): Promise<unknown[]>
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────
-function sevenDaysAgo(): Date {
-  const d = new Date()
-  d.setDate(d.getDate() - 7)
-  return d
-}
-
 function isoDate(ts: number | string | undefined): string {
   if (!ts) return new Date().toISOString().slice(0, 10)
   const d = new Date(typeof ts === 'number' && ts < 1e12 ? ts * 1000 : ts)
@@ -89,14 +83,86 @@ function isWithinLastNDays(ts: number | string | undefined, days: number): boole
   return d >= cutoff
 }
 
+// ─── English Language Filter ──────────────────────────────────────────────
+function isEnglishText(text: string): boolean {
+  if (!text || text.trim().length === 0) return true
+
+  // 1. Reject non-Latin alphabets (Cyrillic, Arabic, Chinese/Japanese/Korean, Devanagari, Thai, Hebrew)
+  const nonLatinRegex = /[\u0400-\u04FF\u0600-\u06FF\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF\u0900-\u097F\u0E00-\u0E7F\u0590-\u05FF]/
+  if (nonLatinRegex.test(text)) return false
+
+  // 2. Extract words
+  const words = (text.toLowerCase().match(/[a-z]{2,}/g) || [])
+  if (words.length === 0) return true
+
+  // Common English words & AI/marketing keywords
+  const commonEnglishWords = new Set([
+    'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i',
+    'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at',
+    'this', 'but', 'by', 'from', 'they', 'we', 'say', 'her', 'she',
+    'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there', 'their', 'what',
+    'so', 'up', 'out', 'if', 'about', 'who', 'get', 'which', 'go', 'me',
+    'when', 'make', 'can', 'like', 'time', 'no', 'just', 'know', 'take',
+    'people', 'into', 'year', 'your', 'good', 'some', 'could', 'them', 'see', 'other',
+    'than', 'then', 'now', 'look', 'only', 'come', 'its', 'over', 'think', 'also',
+    'back', 'after', 'use', 'how', 'our', 'work', 'first', 'well', 'way',
+    'even', 'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'us',
+    'is', 'are', 'was', 'were', 'has', 'had', 'ai', 'video', 'tools', 'free', 'save',
+    'here', 'why', 'top', 'growth', 'business', 'app', 'code', 'tips', 'guide', 'learn',
+    'marketing', 'agent', 'agents', 'automate', 'automation', 'saas', 'workflow',
+    'build', 'create', 'prompt', 'chatgpt', 'claude', 'tutorial', 'watch', 'secret',
+    'money', 'make', 'scaling', 'client', 'leads', 'revenue', 'content'
+  ])
+
+  // Non-English stopword markers (Portuguese, Spanish, French, German, Italian)
+  const nonEnglishMarkers = new Set([
+    'para', 'com', 'você', 'voce', 'uma', 'não', 'nao', 'mais', 'como', 'por', 'dos', 'das',
+    'pero', 'este', 'esta', 'estos', 'estas', 'pour', 'avec', 'dans', 'sur',
+    'und', 'der', 'die', 'das', 'nicht', 'mit', 'ist', 'von', 'dem', 'des',
+    'una', 'del', 'las', 'los', 'cette', 'votre', 'nous', 'vous', 'sono', 'della'
+  ])
+
+  let enMatches = 0
+  let nonEnMatches = 0
+  for (const w of words) {
+    if (commonEnglishWords.has(w)) enMatches++
+    if (nonEnglishMarkers.has(w)) nonEnMatches++
+  }
+
+  if (nonEnMatches > enMatches && nonEnMatches >= 2) {
+    return false
+  }
+
+  return true
+}
+
+// ─── Niche Hashtag Helpers ────────────────────────────────────────────────
+function getNicheHashtags(niche: string): string[] {
+  const cleanTag = niche.replace(/[^\w]/g, '').toLowerCase()
+  const lower = niche.toLowerCase()
+
+  const map: Record<string, string[]> = {
+    'ai agents': ['aiagents', 'aiagent', 'agenticai', 'aiworkflow'],
+    'ai automation': ['aiautomation', 'aiworkflow', 'n8n', 'makeautomation'],
+    'b2b saas': ['b2bsaas', 'saas', 'saasgrowth', 'b2bmarketing'],
+    'growth marketing': ['growthmarketing', 'growthhacks', 'marketingtips', 'digitalmarketing'],
+  }
+
+  if (map[lower]) return map[lower]
+
+  const tags = [cleanTag]
+  if (cleanTag.endsWith('s')) tags.push(cleanTag.slice(0, -1))
+  tags.push(`${cleanTag}tips`, `${cleanTag}tools`)
+  return tags.slice(0, 4)
+}
+
 // ─── TikTok scrape ────────────────────────────────────────────────────────
-// Uses clockworks/tiktok-scraper with hashtag input (most reliable for keyword discovery)
+// Uses clockworks/tiktok-scraper with hashtag input
 async function scrapeTikTok(niche: string): Promise<ViralResult[]> {
-  // Convert niche to hashtag format (remove spaces, lowercase)
-  const hashtag = niche.replace(/\s+/g, '').toLowerCase()
+  const hashtags = getNicheHashtags(niche)
 
   const items = await runApifyActor('clockworks~tiktok-scraper', {
-    hashtags: [hashtag],
+    hashtags: hashtags.slice(0, 3),
     resultsPerPage: 40,
     shouldDownloadVideos: false,
     shouldDownloadCovers: false,
@@ -107,30 +173,35 @@ async function scrapeTikTok(niche: string): Promise<ViralResult[]> {
     excludePinnedPosts: false,
   })
 
-  console.log(`[TikTok] Got ${items.length} raw items for hashtag #${hashtag}`)
+  console.log(`[TikTok] Got ${items.length} raw items for #${hashtags.join(', #')}`)
 
   const results: ViralResult[] = []
+  const seenUrls = new Set<string>()
+
   for (const item of items as Record<string, unknown>[]) {
-    // createTime is unix seconds; createTimeISO is ISO string
     const createTime = (item.createTime as number) || undefined
     const createTimeISO = (item.createTimeISO as string) || undefined
     const ts = createTimeISO || createTime
 
-    // Strictly filter to the last 7 days ONLY
+    // 1. Strictly filter to the last 7 days ONLY
     if (ts && !isWithinLastNDays(ts, 7)) continue
 
     const playCount = (item.playCount as number) || 0
     const diggCount = (item.diggCount as number) || 0
     const webVideoUrl = (item.webVideoUrl as string) || ''
+    const desc = (item.text as string) || ''
 
-    // authorMeta is nested object
+    // 2. Filter strictly for English content
+    if (!isEnglishText(desc)) continue
+
+    // Author metadata
     const authorMeta = item.authorMeta as Record<string, string | number | boolean> | undefined
     const username = (authorMeta?.name as string) || 'unknown'
     const nickname = (authorMeta?.nickName as string) || username
-    const desc = (item.text as string) || ''
 
-    if (!webVideoUrl) continue
-    if (playCount === 0) continue
+    if (!webVideoUrl || playCount === 0) continue
+    if (seenUrls.has(webVideoUrl)) continue
+    seenUrls.add(webVideoUrl)
 
     results.push({
       id: `tt-${(item.id as string) || Math.random().toString(36).slice(2)}`,
@@ -148,7 +219,7 @@ async function scrapeTikTok(niche: string): Promise<ViralResult[]> {
     })
   }
 
-  // Sort by views desc, return top 5
+  // Sort strictly by views descending and return the exact Top 5
   return results
     .sort((a, b) => b.views - a.views)
     .slice(0, 5)
@@ -157,42 +228,49 @@ async function scrapeTikTok(niche: string): Promise<ViralResult[]> {
 // ─── Instagram Reels scrape ───────────────────────────────────────────────
 // Uses apify/instagram-scraper with hashtag explore URL + resultsType: reels
 async function scrapeInstagram(niche: string): Promise<ViralResult[]> {
-  // Use the hashtag explore URL — no spaces, just the term
-  const hashtag = niche.replace(/\s+/g, '').toLowerCase()
-  const hashtagUrl = `https://www.instagram.com/explore/tags/${encodeURIComponent(hashtag)}/`
+  const hashtags = getNicheHashtags(niche)
+  const exploreUrls = hashtags.slice(0, 3).map(
+    t => `https://www.instagram.com/explore/tags/${encodeURIComponent(t)}/`
+  )
 
   const items = await runApifyActor('apify~instagram-scraper', {
-    directUrls: [hashtagUrl],
+    directUrls: exploreUrls,
     resultsType: 'reels',
     resultsLimit: 40,
     addParentData: false,
   })
 
-  console.log(`[Instagram] Got ${items.length} raw items for #${hashtag}`)
+  console.log(`[Instagram] Got ${items.length} raw items for #${hashtags.join(', #')}`)
 
   const results: ViralResult[] = []
+  const seenUrls = new Set<string>()
+
   for (const item of items as Record<string, unknown>[]) {
     const timestamp = (item.timestamp as string) || undefined
 
-    // Strictly filter to the last 7 days ONLY
+    // 1. Strictly filter to the last 7 days ONLY
     if (timestamp && !isWithinLastNDays(timestamp, 7)) continue
+
+    const caption = ((item.caption as string) || '').slice(0, 250)
+
+    // 2. Filter strictly for English content
+    if (!isEnglishText(caption)) continue
 
     const videoPlayCount = (item.videoPlayCount as number) || (item.videoViewCount as number) || 0
     const likesCount = (item.likesCount as number) || 0
     const shortCode = (item.shortCode as string) || ''
     const ownerUsername = (item.ownerUsername as string) || 'unknown'
     const ownerFullName = (item.ownerFullName as string) || ownerUsername
-    const caption = ((item.caption as string) || '').slice(0, 250)
     const type = (item.type as string) || ''
 
-    // Build direct reel URL from shortCode — Instagram reels use /reel/ path
     const reelUrl = shortCode
       ? `https://www.instagram.com/reel/${shortCode}/`
       : (item.url as string) || ''
 
-    // Only keep video items with some plays
     if (!reelUrl || type === 'Image') continue
     if (videoPlayCount === 0 && likesCount === 0) continue
+    if (seenUrls.has(reelUrl)) continue
+    seenUrls.add(reelUrl)
 
     results.push({
       id: `ig-${(item.id as string) || shortCode || Math.random().toString(36).slice(2)}`,
@@ -202,7 +280,7 @@ async function scrapeInstagram(niche: string): Promise<ViralResult[]> {
       creator_handle: `@${ownerUsername}`,
       caption,
       url: reelUrl,
-      views: videoPlayCount || likesCount * 8, // fallback estimate if views not available
+      views: videoPlayCount || likesCount * 8,
       likes: likesCount,
       estimated_reach: Math.round((videoPlayCount || likesCount * 8) * 1.5),
       published_at: isoDate(timestamp),
@@ -210,6 +288,7 @@ async function scrapeInstagram(niche: string): Promise<ViralResult[]> {
     })
   }
 
+  // Sort strictly by views descending and return the exact Top 5
   return results
     .sort((a, b) => b.views - a.views)
     .slice(0, 5)
@@ -256,7 +335,7 @@ export async function POST(req: Request) {
       instagram: instagramResult.status === 'rejected' ? (instagramResult.reason as Error).message : null,
     }
 
-    console.log(`[viral-search] "${niche}": ${tiktokPosts.length} TikTok, ${instagramPosts.length} Instagram posts`)
+    console.log(`[viral-search] "${niche}": ${tiktokPosts.length} TikTok, ${instagramPosts.length} Instagram English posts from last 7 days`)
 
     // Cache the result
     cache.set(cacheKey, { data: posts, cachedAt: Date.now() })
