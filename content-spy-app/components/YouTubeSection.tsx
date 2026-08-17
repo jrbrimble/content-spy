@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { YouTubePost } from '@/lib/types'
+import { formatDate } from '@/lib/utils'
 
 interface Props {
   posts: YouTubePost[]
@@ -51,7 +52,7 @@ export default function YouTubeSection({ posts }: Props) {
                   </span>
                   {post.published_at && (
                     <span className="text-xs text-slate-400">
-                      {new Date(post.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {formatDate(post.published_at)}
                     </span>
                   )}
                 </div>

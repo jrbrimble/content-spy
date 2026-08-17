@@ -1,6 +1,7 @@
 'use client'
 
 import { ViralPost } from '@/lib/types'
+import { formatDate } from '@/lib/utils'
 
 interface Props {
   post: ViralPost
@@ -73,9 +74,11 @@ export default function ViralPostCard({ post, rank }: Props) {
             {PLATFORM_ICONS[post.platform]}
             <span>{PLATFORM_LABELS[post.platform]}</span>
           </span>
-          <span className="text-[10px] text-slate-400 font-medium">
-            📅 {post.published_at}
-          </span>
+          {post.published_at && (
+            <span className="text-[10px] text-slate-400 font-medium">
+              📅 {formatDate(post.published_at)}
+            </span>
+          )}
         </div>
       </div>
 

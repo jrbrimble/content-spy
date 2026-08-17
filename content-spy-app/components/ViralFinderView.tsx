@@ -2,11 +2,19 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { ViralPost, ViralPlatform } from '@/lib/types'
+import { getViralPosts } from '@/lib/data'
+import { formatDateTime } from '@/lib/utils'
 import ViralPostCard from './ViralPostCard'
 
 const DEFAULT_NICHES = ['AI Agents', 'AI Automation', 'B2B SaaS', 'Growth Marketing']
 
 type SearchStatus = 'idle' | 'searching' | 'done' | 'error'
+
+interface ViralStorageData {
+  posts: ViralPost[]
+  lastSearchedNiche: string
+  scrapedAt: string
+}
 
 export default function ViralFinderView() {
   const [niches, setNiches] = useState<string[]>(DEFAULT_NICHES)
@@ -17,21 +25,57 @@ export default function ViralFinderView() {
   const [searchStatus, setSearchStatus] = useState<SearchStatus>('idle')
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [lastSearchedNiche, setLastSearchedNiche] = useState<string | null>(null)
-  const [cachedAt, setCachedAt] = useState<string | null>(null)
+  const [scrapedAt, setScrapedAt] = useState<string | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Load niches from localStorage on mount
+  // Load saved niches and last scraped data from localStorage on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('content_spy_niches')
-      if (saved) {
-        const parsed = JSON.parse(saved)
+      // 1. Load niches
+      const savedNiches = localStorage.getItem('content_spy_niches')
+      let currentNiche = selectedNiche
+      if (savedNiches) {
+        const parsed = JSON.parse(savedNiches)
         if (Array.isArray(parsed) && parsed.length > 0) {
           setNiches(parsed)
-          if (!parsed.includes(selectedNiche)) setSelectedNiche(parsed[0])
+          if (!parsed.includes(selectedNiche)) {
+            currentNiche = parsed[0]
+            setSelectedNiche(parsed[0])
+          }
         }
       }
+
+      // 2. Load last scraped viral data
+      const savedViral = localStorage.getItem('content_spy_viral_cache')
+      if (savedViral) {
+        const parsedData: ViralStorageData = JSON.parse(savedViral)
+        if (parsedData && Array.isArray(parsedData.posts) && parsedData.posts.length > 0) {
+          setPosts(parsedData.posts)
+          setLastSearchedNiche(parsedData.lastSearchedNiche || currentNiche)
+          setScrapedAt(parsedData.scrapedAt || null)
+          setSearchStatus('done')
+          return
+        }
+      }
+
+      // 3. If no localStorage data yet, load from DB fallback
+      getViralPosts(currentNiche).then(fallbackPosts => {
+        if (fallbackPosts && fallbackPosts.length > 0) {
+          const now = new Date().toISOString()
+          setPosts(fallbackPosts)
+          setLastSearchedNiche(currentNiche)
+          setScrapedAt(now)
+          setSearchStatus('done')
+          try {
+            localStorage.setItem('content_spy_viral_cache', JSON.stringify({
+              posts: fallbackPosts,
+              lastSearchedNiche: currentNiche,
+              scrapedAt: now,
+            }))
+          } catch { /* ignore */ }
+        }
+      }).catch(() => { /* ignore */ })
     } catch { /* ignore */ }
   }, [])
 
@@ -48,7 +92,6 @@ export default function ViralFinderView() {
     setElapsed(0)
     setSearchStatus('searching')
     setStatusMessage(null)
-    setCachedAt(null)
     if (timerRef.current) clearInterval(timerRef.current)
     timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
 
@@ -84,15 +127,26 @@ export default function ViralFinderView() {
         scraped_at: p.scraped_at as string,
       }))
 
+      const scrapeTime = json.cachedAt || new Date().toISOString()
+
       setPosts(mapped)
       setLastSearchedNiche(target)
+      setScrapedAt(scrapeTime)
       setSearchStatus('done')
 
+      // Persist latest data to localStorage so it stays displayed continuously
+      try {
+        localStorage.setItem('content_spy_viral_cache', JSON.stringify({
+          posts: mapped,
+          lastSearchedNiche: target,
+          scrapedAt: scrapeTime,
+        }))
+      } catch { /* ignore */ }
+
       if (json.cached && json.cachedAt) {
-        setCachedAt(json.cachedAt)
-        setStatusMessage(`⚡ Instant results from cache (refreshes hourly)`)
+        setStatusMessage(`⚡ Fresh results loaded from cache (${formatDateTime(json.cachedAt)})`)
       } else {
-        setStatusMessage(`✅ Found ${mapped.length} viral posts for "${target}"`)
+        setStatusMessage(`✅ Scraped ${mapped.length} top viral posts for "${target}"`)
       }
 
       // Warn about partial failures
@@ -144,7 +198,7 @@ export default function ViralFinderView() {
               <h2 className="text-xl font-bold text-white tracking-tight">Viral Content Finder</h2>
             </div>
             <p className="text-slate-400 text-xs mt-1">
-              Enter your niche — the system scrapes <strong className="text-slate-300">real live data</strong> from TikTok & Instagram, ranked by actual views from the last 7 days.
+              Enter your niche — the system scrapes <strong className="text-slate-300">real live data</strong> from TikTok &amp; Instagram, ranked by actual views from the last 7 days.
             </p>
 
             {/* Niche Selector Pills */}
@@ -220,10 +274,45 @@ export default function ViralFinderView() {
               )}
             </button>
             <span className="text-[11px] text-slate-400">
-              Searching for <strong className="text-slate-300">{selectedNiche}</strong>
+              Targeting <strong className="text-slate-300">{selectedNiche}</strong>
             </span>
           </div>
         </div>
+
+        {/* Last Data Date / Scraped Timestamp Banner */}
+        {scrapedAt && (
+          <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="inline-flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl text-slate-300">
+                <svg className="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-slate-400">Last Scraped:</span>
+                <span className="font-semibold text-white">{formatDateTime(scrapedAt)}</span>
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl text-slate-300">
+                <span className="text-violet-400 font-bold">📅</span>
+                <span className="text-slate-400">Content Window:</span>
+                <span className="font-semibold text-slate-200">Last 7 Days</span>
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl text-slate-300">
+                <span className="text-pink-400 font-bold">🎯</span>
+                <span className="text-slate-400">Current Dataset:</span>
+                <span className="font-semibold text-slate-200">{lastSearchedNiche || selectedNiche}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-emerald-400 text-xs font-medium">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>Saved results displayed</span>
+            </div>
+          </div>
+        )}
 
         {/* Status / Info Bar */}
         {isSearching && (
@@ -234,9 +323,9 @@ export default function ViralFinderView() {
             </svg>
             <div>
               <p className="text-amber-300 text-xs font-semibold">
-                Scraping TikTok & Instagram for &ldquo;{selectedNiche}&rdquo; — this takes 20–60 seconds for fresh results.
+                Scraping TikTok &amp; Instagram for &ldquo;{selectedNiche}&rdquo; — this takes 20–60 seconds for fresh live results.
               </p>
-              <p className="text-amber-400/60 text-[10px] mt-0.5">Results are cached for 1 hour — subsequent searches are instant ⚡</p>
+              <p className="text-amber-400/60 text-[10px] mt-0.5">Results will stay saved and displayed until you click Find Viral Content again.</p>
             </div>
           </div>
         )}
@@ -303,26 +392,7 @@ export default function ViralFinderView() {
       </div>
 
       {/* Posts Grid */}
-      {searchStatus === 'idle' ? (
-        /* Initial empty state — no search done yet */
-        <div className="text-center py-24 bg-slate-900/40 border border-slate-800/80 rounded-2xl">
-          <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-7 h-7 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-          <p className="text-white font-semibold text-sm">Ready to find viral content</p>
-          <p className="text-slate-400 text-xs mt-1 mb-5 max-w-sm mx-auto">
-            Select or add a niche above, then click <strong className="text-amber-400">Find Viral Content</strong> to scrape real live data from TikTok & Instagram.
-          </p>
-          <button
-            onClick={() => handleSearch()}
-            className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all active:scale-95"
-          >
-            Find Viral Content
-          </button>
-        </div>
-      ) : isSearching ? (
+      {isSearching ? (
         /* Loading state */
         <div className="flex flex-col items-center justify-center py-24 gap-4">
           <div className="relative">
@@ -330,7 +400,7 @@ export default function ViralFinderView() {
             <div className="absolute inset-0 w-14 h-14 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
           </div>
           <div className="text-center">
-            <p className="text-white text-sm font-semibold">Scanning TikTok & Instagram...</p>
+            <p className="text-white text-sm font-semibold">Scanning TikTok &amp; Instagram...</p>
             <p className="text-slate-400 text-xs mt-1">Finding the most-viewed &ldquo;{selectedNiche}&rdquo; posts from the last 7 days</p>
           </div>
           <div className="flex items-center gap-2 mt-2">
@@ -343,18 +413,22 @@ export default function ViralFinderView() {
           </div>
         </div>
       ) : filteredPosts.length === 0 ? (
-        /* No results */
+        /* No results / Initial state if empty */
         <div className="text-center py-20 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-8">
-          <p className="text-slate-300 font-semibold text-sm">No results found</p>
-          <p className="text-slate-500 text-xs mt-1 mb-4">
-            No {activePlatform === 'tiktok' ? 'TikTok videos' : 'Instagram Reels'} found for &ldquo;{lastSearchedNiche}&rdquo; from the last 7 days.
-            Try a different niche or a broader term.
+          <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-7 h-7 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <p className="text-slate-300 font-semibold text-sm">No viral posts loaded</p>
+          <p className="text-slate-500 text-xs mt-1 mb-5 max-w-sm mx-auto">
+            Click <strong className="text-amber-400">Find Viral Content</strong> to search TikTok &amp; Instagram for top &ldquo;{selectedNiche}&rdquo; posts.
           </p>
           <button
             onClick={() => handleSearch()}
-            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg transition-all"
+            className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold text-xs rounded-xl shadow-lg transition-all"
           >
-            Search Again
+            Find Viral Content
           </button>
         </div>
       ) : (

@@ -18,7 +18,18 @@ ydl_opts = {
 
 def fetch_youtube(slug: str, channel_url: str) -> list[dict]:
     videos = []
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    ydl_opts_flat = {
+        "extract_flat": True,
+        "quiet": True,
+        "playlistend": 10,
+        "nocheckcertificate": True,
+    }
+    ydl_opts_video = {
+        "quiet": True,
+        "nocheckcertificate": True,
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts_flat) as ydl, yt_dlp.YoutubeDL(ydl_opts_video) as ydl_vid:
         try:
             info = ydl.extract_info(f"{channel_url}/videos", download=False)
             if not info or "entries" not in info:
@@ -26,23 +37,45 @@ def fetch_youtube(slug: str, channel_url: str) -> list[dict]:
             for entry in info.get("entries", []):
                 if not entry:
                     continue
-                
-                # Extract date from timestamp or default to today
-                ts = entry.get("timestamp")
-                if ts:
-                    pub_dt = datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc)
-                else:
-                    pub_dt = CURRENT_DATE
 
                 video_id = entry.get("id") or ""
-                url = f"https://www.youtube.com/watch?v={video_id}" if video_id else entry.get("url", "")
-                
+                if not video_id:
+                    continue
+                url = f"https://www.youtube.com/watch?v={video_id}"
+
+                # Fetch exact metadata for this video to get accurate upload date & views
+                try:
+                    vid_info = ydl_vid.extract_info(url, download=False)
+                except Exception:
+                    vid_info = entry
+
+                ud = vid_info.get("upload_date")
+                ts = vid_info.get("timestamp") or vid_info.get("release_timestamp")
+
+                pub_dt = None
+                if ud and len(str(ud)) == 8:
+                    try:
+                        pub_dt = datetime.datetime.strptime(str(ud), "%Y%m%d").replace(tzinfo=datetime.timezone.utc)
+                    except Exception:
+                        pass
+                if not pub_dt and ts:
+                    try:
+                        pub_dt = datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc)
+                    except Exception:
+                        pass
+
+                # Filter strictly within last 14 days if date is known
+                if pub_dt and pub_dt < FOURTEEN_DAYS_AGO:
+                    continue
+
+                date_str = pub_dt.strftime("%Y-%m-%d") if pub_dt else None
+
                 videos.append({
-                    "title": entry.get("title", ""),
+                    "title": vid_info.get("title") or entry.get("title", ""),
                     "url": url,
-                    "views": entry.get("view_count") or 0,
-                    "date": pub_dt.strftime("%Y-%m-%d"),
-                    "description": (entry.get("description") or "")[:2000],
+                    "views": vid_info.get("view_count") or entry.get("view_count") or 0,
+                    "date": date_str,
+                    "description": (vid_info.get("description") or entry.get("description") or "")[:2000],
                 })
         except Exception as e:
             print(f"  ERROR fetching YouTube for {slug}: {e}")

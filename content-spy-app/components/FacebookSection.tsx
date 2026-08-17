@@ -1,6 +1,7 @@
 'use client'
 
 import { FacebookPost } from '@/lib/types'
+import { formatDate } from '@/lib/utils'
 
 interface Props {
   posts: FacebookPost[]
@@ -52,7 +53,7 @@ export default function FacebookSection({ posts }: Props) {
                 </span>
                 {post.published_at && (
                   <span className="text-xs text-slate-400">
-                    {new Date(post.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {formatDate(post.published_at)}
                   </span>
                 )}
                 <a

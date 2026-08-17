@@ -1,6 +1,7 @@
 'use client'
 
 import { TwitterPost } from '@/lib/types'
+import { formatDate } from '@/lib/utils'
 
 interface Props {
   posts: TwitterPost[]
@@ -44,7 +45,7 @@ export default function TwitterSection({ posts }: Props) {
                 )}
                 {post.published_at && (
                   <span className="text-xs text-slate-400">
-                    {new Date(post.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {formatDate(post.published_at)}
                   </span>
                 )}
                 <a

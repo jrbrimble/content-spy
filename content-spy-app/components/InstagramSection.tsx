@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { InstagramPost } from '@/lib/types'
+import { formatDate } from '@/lib/utils'
 
 interface Props {
   posts: InstagramPost[]
@@ -63,7 +64,7 @@ export default function InstagramSection({ posts }: Props) {
                   </span>
                   {post.published_at && (
                     <span className="text-xs text-slate-400">
-                      {new Date(post.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {formatDate(post.published_at)}
                     </span>
                   )}
                   <a

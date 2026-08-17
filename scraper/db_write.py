@@ -58,6 +58,7 @@ def clear_posts_for_competitor(competitor_id: str):
 def write_youtube_posts(competitor_id: str, posts: list[dict]):
     """Upsert YouTube posts for a competitor."""
     client = get_client()
+    client.table("youtube_posts").delete().eq("competitor_id", competitor_id).execute()
     rows = []
     for p in posts:
         rows.append({
@@ -77,6 +78,7 @@ def write_youtube_posts(competitor_id: str, posts: list[dict]):
 def write_twitter_posts(competitor_id: str, posts: list[dict]):
     """Upsert Twitter posts for a competitor."""
     client = get_client()
+    client.table("twitter_posts").delete().eq("competitor_id", competitor_id).execute()
     rows = []
     for p in posts:
         rows.append({
@@ -95,6 +97,7 @@ def write_twitter_posts(competitor_id: str, posts: list[dict]):
 def write_instagram_posts(competitor_id: str, posts: list[dict]):
     """Upsert Instagram posts for a competitor."""
     client = get_client()
+    client.table("instagram_posts").delete().eq("competitor_id", competitor_id).execute()
     rows = []
     for p in posts:
         rows.append({
@@ -116,6 +119,7 @@ def write_instagram_posts(competitor_id: str, posts: list[dict]):
 def write_facebook_posts(competitor_id: str, posts: list[dict]):
     """Upsert Facebook posts for a competitor."""
     client = get_client()
+    client.table("facebook_posts").delete().eq("competitor_id", competitor_id).execute()
     rows = []
     for p in posts:
         rows.append({
