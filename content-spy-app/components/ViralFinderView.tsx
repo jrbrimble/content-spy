@@ -46,11 +46,16 @@ export default function ViralFinderView() {
         }
       }
 
-      // 2. Load last scraped viral data
-      const savedViral = localStorage.getItem('content_spy_viral_cache')
+      // Clear legacy mock cache if present
+      localStorage.removeItem('content_spy_viral_cache')
+
+      // 2. Load last scraped viral data (v2 live only)
+      const savedViral = localStorage.getItem('content_spy_viral_live_v2')
       if (savedViral) {
         const parsedData: ViralStorageData = JSON.parse(savedViral)
-        if (parsedData && Array.isArray(parsedData.posts) && parsedData.posts.length > 0) {
+        // Discard if empty or contains legacy mock IDs
+        const isMock = parsedData?.posts?.some(p => p.id?.startsWith('tt-aiagents-') || p.id?.startsWith('ig-aiagents-'))
+        if (parsedData && Array.isArray(parsedData.posts) && parsedData.posts.length > 0 && !isMock) {
           setPosts(parsedData.posts)
           setLastSearchedNiche(parsedData.lastSearchedNiche || currentNiche)
           setScrapedAt(parsedData.scrapedAt || null)
@@ -59,19 +64,20 @@ export default function ViralFinderView() {
         }
       }
 
-      // 3. If no localStorage data yet, load from DB fallback
-      getViralPosts(currentNiche).then(fallbackPosts => {
-        if (fallbackPosts && fallbackPosts.length > 0) {
+      // 3. If no localStorage data yet, query Supabase for real live posts
+      getViralPosts(currentNiche).then(livePosts => {
+        const isMock = livePosts?.some(p => p.id?.startsWith('tt-aiagents-') || p.id?.startsWith('ig-aiagents-'))
+        if (livePosts && livePosts.length > 0 && !isMock) {
           const now = new Date().toISOString()
-          setPosts(fallbackPosts)
+          setPosts(livePosts)
           setLastSearchedNiche(currentNiche)
-          setScrapedAt(now)
+          setScrapedAt(livePosts[0]?.scraped_at || now)
           setSearchStatus('done')
           try {
-            localStorage.setItem('content_spy_viral_cache', JSON.stringify({
-              posts: fallbackPosts,
+            localStorage.setItem('content_spy_viral_live_v2', JSON.stringify({
+              posts: livePosts,
               lastSearchedNiche: currentNiche,
-              scrapedAt: now,
+              scrapedAt: livePosts[0]?.scraped_at || now,
             }))
           } catch { /* ignore */ }
         }
@@ -136,7 +142,7 @@ export default function ViralFinderView() {
 
       // Persist latest data to localStorage so it stays displayed continuously
       try {
-        localStorage.setItem('content_spy_viral_cache', JSON.stringify({
+        localStorage.setItem('content_spy_viral_live_v2', JSON.stringify({
           posts: mapped,
           lastSearchedNiche: target,
           scrapedAt: scrapeTime,

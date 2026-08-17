@@ -97,7 +97,7 @@ async function scrapeTikTok(niche: string): Promise<ViralResult[]> {
 
   const items = await runApifyActor('clockworks~tiktok-scraper', {
     hashtags: [hashtag],
-    resultsPerPage: 30,
+    resultsPerPage: 40,
     shouldDownloadVideos: false,
     shouldDownloadCovers: false,
     shouldDownloadSubtitles: false,
@@ -115,6 +115,9 @@ async function scrapeTikTok(niche: string): Promise<ViralResult[]> {
     const createTime = (item.createTime as number) || undefined
     const createTimeISO = (item.createTimeISO as string) || undefined
     const ts = createTimeISO || createTime
+
+    // Strictly filter to the last 7 days ONLY
+    if (ts && !isWithinLastNDays(ts, 7)) continue
 
     const playCount = (item.playCount as number) || 0
     const diggCount = (item.diggCount as number) || 0
@@ -161,7 +164,7 @@ async function scrapeInstagram(niche: string): Promise<ViralResult[]> {
   const items = await runApifyActor('apify~instagram-scraper', {
     directUrls: [hashtagUrl],
     resultsType: 'reels',
-    resultsLimit: 30,
+    resultsLimit: 40,
     addParentData: false,
   })
 
@@ -169,18 +172,11 @@ async function scrapeInstagram(niche: string): Promise<ViralResult[]> {
 
   const results: ViralResult[] = []
   for (const item of items as Record<string, unknown>[]) {
-    // Instagram reels output fields from the docs:
-    // url: "https://www.instagram.com/p/DZN3mhZBQ_Q/" (uses /p/ even for reels)
-    // shortCode: "DZN3mhZBQ_Q"
-    // videoPlayCount: number (total plays)
-    // videoViewCount: number
-    // likesCount: number
-    // timestamp: "2026-06-05T19:58:30.000Z"
-    // ownerUsername, ownerFullName
-    // type: "Video"
-    // productType: "clips" (for reels)
-
     const timestamp = (item.timestamp as string) || undefined
+
+    // Strictly filter to the last 7 days ONLY
+    if (timestamp && !isWithinLastNDays(timestamp, 7)) continue
+
     const videoPlayCount = (item.videoPlayCount as number) || (item.videoViewCount as number) || 0
     const likesCount = (item.likesCount as number) || 0
     const shortCode = (item.shortCode as string) || ''
